@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>گەڕانی مەکتەبەی شامیلە | وەرگێڕانی کوردی</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* دیزاینی شاهانە و ئیسلامی */
+        body { 
+            background-color: #fdfbf7; 
+            font-family: 'Cairo', sans-serif; 
+            /* نەخشی ئیسلامی باکگراوەند بە کاڵی */
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2.5L22.5 11 25 13.5V16h20v2H25v2.5L22.5 23zM11 22.5L13.5 25 11 27.5 8.5 25zm29 0l2.5 2.5-2.5 2.5-2.5-2.5zM11 8.5L13.5 11 11 13.5 8.5 11zm29 0l2.5 2.5-2.5 2.5-2.5-2.5z' fill='%23d97706' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+        .arabic-text { font-family: 'Amiri', serif; }
+        .islamic-header {
+            background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+            border-bottom: 4px solid #b45309;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800">
+
+    <!-- بەشی سەرووی ماڵپەڕ -->
+    <header class="islamic-header shadow-lg py-8 mb-10 px-4 relative overflow-hidden">
+        <div class="max-w-5xl mx-auto text-center relative z-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-amber-50 mb-3 arabic-text tracking-wide">المكتبة الشاملة</h1>
+            <h2 class="text-xl md:text-2xl text-amber-200 font-bold">بزوێنەری گەڕان و وەرگێڕانی کوردی (سۆرانی)</h2>
+            <p class="text-emerald-100 mt-2 text-sm">زیاتر لە ١٢٠ ئەنجام بە یەک کلیک وەربگێڕە</p>
+        </div>
+    </header>
+
+    <div class="max-w-5xl mx-auto px-4 pb-20">
+        
+        <!-- خانەی گەڕان -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl border-t-4 border-amber-600 mb-10 relative">
+            <div class="flex flex-col md:flex-row gap-4">
+                <input type="text" id="searchInput" 
+                    class="w-full border-2 border-gray-200 rounded-xl px-5 py-4 focus:outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 text-xl transition" 
+                    placeholder="بۆ نموونە بنووسە: الصلاة، الزكاة..."
+                    onkeypress="if(event.key === 'Enter') startSearch()">
+                <button onclick="startSearch()" 
+                    class="bg-emerald-800 hover:bg-emerald-900 text-amber-50 font-bold py-4 px-10 rounded-xl transition duration-300 text-xl shadow-md border border-emerald-950 w-full md:w-auto flex-shrink-0">
+                    گەڕان بـکـە
+                </button>
+            </div>
+            
+            <!-- نیشاندەری باری گەڕان -->
+            <div id="status" class="hidden mt-6 text-center bg-emerald-50 p-4 rounded-lg border border-emerald-100 flex items-center justify-center gap-4">
+                <div id="statusLoader" class="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-700"></div>
+                <span id="statusText" class="text-emerald-800 font-bold text-lg">دەستپێکردن...</span>
+                <span id="counterBadge" class="bg-amber-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow hidden">٠ ئەنجام</span>
+            </div>
+        </div>
+
+        <!-- شوێنی ئەنجامەکان -->
+        <div id="resultsContainer" class="space-y-8"></div>
+        
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let isFetching = false;
+        let currentQuery = "";
+        let totalResultsCount = 0;
+
+        async function startSearch() {
+            currentQuery = document.getElementById('searchInput').value.trim();
+            if(!currentQuery) {
+                alert("تکایە سەرەتا وشەیەک بنووسە");
+                return;
+            }
+            
+            document.getElementById('resultsContainer').innerHTML = '';
+            document.getElementById('status').classList.remove('hidden');
+            document.getElementById('statusLoader').classList.remove('hidden');
+            document.getElementById('counterBadge').classList.remove('hidden');
+            
+            currentPage = 1;
+            totalResultsCount = 0;
+            isFetching = true;
+            document.getElementById('counterBadge').innerText = '٠ ئەنجام';
+            
+            await fetchNextPage();
+        }
+
+        async function fetchNextPage() {
+            if(!isFetching) return;
+            
+            try {
+                document.getElementById('statusText').innerText = `لە هێنان و وەرگێڕانی داتای نوێ... (کۆی گشتی تا ئێستا: ${totalResultsCount})`;
+                
+                const response = await fetch(`/api/search?q=${encodeURIComponent(currentQuery)}&page=${currentPage}`);
+                const data = await response.json();
+                
+                if(data.error) {
+                     document.getElementById('statusText').innerHTML = `<span class="text-red-600">${data.error}</span>`;
+                     isFetching = false;
+                     return;
+                }
+                
+                if (data.results && data.results.length > 0) {
+                    renderResults(data.results);
+                    totalResultsCount += data.results.length;
+                    document.getElementById('counterBadge').innerText = `${totalResultsCount} ئەنجام`;
+                }
+                
+                if(data.has_next) {
+                    currentPage++;
+                    // بە شێوەی ئۆتۆماتیکی لاپەڕەی داهاتوو دەهێنێت بێ ئەوەی یوزەر کلیک بکات
+                    setTimeout(fetchNextPage, 400); 
+                } else {
+                    isFetching = false;
+                    document.getElementById('statusText').innerText = `گەڕان کۆتایی هات! هەموو ئەنجامەکان هێنران.`;
+                    document.getElementById('statusLoader').classList.add('hidden');
+                }
+            } catch(e) {
+                document.getElementById('statusText').innerHTML = `<span class="text-red-600">هەڵەیەک ڕوویدا لە پەیوەندی بە سێرڤەرەوە!</span>`;
+                document.getElementById('statusLoader').classList.add('hidden');
+                isFetching = false;
+            }
+        }
+
+        function renderResults(results) {
+            const container = document.getElementById('resultsContainer');
+            
+            results.forEach(item => {
+                const card = document.createElement('div');
+                // دیزاینی کارتی هەر ئەنجامێک
+                card.className = 'bg-white rounded-2xl shadow-lg border border-amber-200 overflow-hidden transform transition duration-300 hover:shadow-2xl';
+                card.innerHTML = `
+                    <div class="bg-emerald-900 px-6 py-4 border-b-4 border-amber-600 flex justify-between items-center text-amber-50">
+                        <h3 class="font-bold text-xl">📖 ${item.book}</h3>
+                        <span class="text-sm bg-emerald-800 px-4 py-1.5 rounded-full border border-emerald-700 shadow-inner font-bold text-amber-100">
+                            لاپەڕە: ${item.page}
+                        </span>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row">
+                        <!-- بەشی عەرەبی (لای ڕاست) -->
+                        <div class="md:w-1/2 p-6 md:p-8 border-b md:border-b-0 md:border-l-2 border-amber-100 bg-amber-50/40 relative">
+                            <span class="absolute top-0 right-0 bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-bl-lg">النص الأصلي</span>
+                            <p class="arabic-text text-2xl md:text-3xl leading-loose text-gray-900 text-right mt-4">
+                                ${item.arabic_text}
+                            </p>
+                        </div>
+                        
+                        <!-- بەشی کوردی (لای چەپ) -->
+                        <div class="md:w-1/2 p-6 md:p-8 bg-white relative">
+                            <span class="absolute top-0 right-0 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-bl-lg">وەرگێڕانی کوردی</span>
+                            <p class="text-xl md:text-2xl leading-relaxed text-gray-800 text-right mt-4 font-bold">
+                                ${item.kurdish_text}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
